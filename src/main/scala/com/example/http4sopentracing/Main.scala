@@ -6,14 +6,26 @@ import org.http4s.implicits._
 import cats.data.Kleisli
 import org.http4s.{Request, Response}
 import org.http4s.server.Router
-import org.log4s.{getLogger, Logger}
 import org.http4s.server.blaze.BlazeServerBuilder
+
+import com.example.http4sopentracing.client.HttpClient
 import com.example.http4sopentracing.health.HealthRoute
+import com.example.http4sopentracing.entrypoint.EntryPoint
+import com.example.http4sopentracing.servicea.ServiceA
+import com.example.http4sopentracing.serviceb.ServiceB
+import com.example.http4sopentracing.servicec.ServiceC
+import com.example.http4sopentracing.serviceiam.ServiceIam
 
 object Server extends IOApp {
-  val logger: Logger = getLogger("simple log")
+  val httpClient = new HttpClient()
 
-  val services = HealthRoute.healthCheck
+  val services = List(
+    new EntryPoint(httpClient).service,
+    new ServiceA(httpClient).service,
+    new ServiceB(httpClient).service,
+    new ServiceC(httpClient).service,
+    new ServiceIam(httpClient).service
+  ).foldLeft(HealthRoute.healthCheck)(_ <+> _) // (acc, item)
 
   val httpApp: Kleisli[IO, Request[IO], Response[IO]] = Router("/" -> services).orNotFound
 
