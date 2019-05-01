@@ -15,9 +15,16 @@ import com.example.http4sopentracing.servicea.ServiceA
 import com.example.http4sopentracing.serviceb.ServiceB
 import com.example.http4sopentracing.servicec.ServiceC
 import com.example.http4sopentracing.serviceiam.ServiceIam
+import com.example.http4sopentracing.tracing.config.{JaegerConfig, ReporterConfig, SamplerConfig, SamplerType}
 
 object Server extends IOApp {
   val httpClient = new HttpClient()
+
+  val jaegerConfig = JaegerConfig(
+    "http4s-opentracing",
+    SamplerConfig(SamplerType.ConstSamplerType, 1),
+    ReporterConfig(true)
+  )
 
   val services = List(
     new EntryPoint(httpClient).service,

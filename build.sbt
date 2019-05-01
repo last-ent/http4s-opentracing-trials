@@ -19,7 +19,8 @@ lazy val root = (project in file("."))
         "-language:higherKinds", // allow higher kinded types without `import scala.language.higherKinds`
         "-Xlint", // enable handy linter warnings
         "-Xfatal-warnings", // turn compiler warnings into errors
-        "-Ypartial-unification" // allow the compiler to unify type constructors of different arities
+        "-Ypartial-unification", // allow the compiler to unify type constructors of different arities
+        "-language:implicitConversions"
       ),
     libraryDependencies ++= appDeps ++ testDeps,
     scalafmtOnCompile := true,
