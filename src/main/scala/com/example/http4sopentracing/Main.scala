@@ -31,15 +31,17 @@ object Server extends IOApp {
   val httpClient = new HttpClient()
 
   val services = List(
-    new ServiceA(httpClient).service,
     new ServiceB(httpClient).service,
     new ServiceC(httpClient).service,
     new ServiceIam(httpClient).service
   ).foldLeft(HealthRoute.healthCheck)(_ <+> _) // (acc, item)
 
+  val tracer = getTracer
+
   val httpApp: Kleisli[IO, Request[IO], Response[IO]] = Router(
     "/" -> services,
-    "/entrypoint" -> TraceMiddleware.wrap(httpClient, "entrypoint", getTracer, EntryPoint.service)
+    "/entrypoint" -> TraceMiddleware.wrap(httpClient, "entrypoint", tracer, EntryPoint.service),
+    "/servicea" -> TraceMiddleware.wrap(httpClient, "service-a", tracer, ServiceA.service)
   ).orNotFound
 
   def getTracer: Tracer = {
