@@ -2,6 +2,7 @@ package com.example.http4sopentracing.entrypoint
 
 import cats.effect.IO
 import com.example.http4sopentracing.client.HttpClient
+import com.example.http4sopentracing.tracer.TraceContext
 import org.http4s.{HttpRoutes, Response => HttpResponse}
 import org.http4s.dsl.io._
 import org.log4s.{getLogger, Logger}
@@ -9,22 +10,30 @@ import com.softwaremill.sttp._
 import cats.implicits._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EntryPoint(httpClient: HttpClient) {
+object EntryPoint {
   implicit val contextShift = IO.contextShift(global)
 
   val logger: Logger = getLogger("EntryPoint")
 
   val baseUrl = "http://127.0.0.1:8080"
 
-  val service = HttpRoutes.of[IO] {
-    case GET -> Root / "entrypoint" =>
+  def service(httpClient: HttpClient, traceCtx: TraceContext) = HttpRoutes.of[IO] {
+    case GET -> Root =>
       for {
         _ <- IO.delay(logger.info("Received request"))
-        _ <- httpClient.get(uri"$baseUrl/serviceiam")
+        _ <- traceCtx.withSpan("call_iam").use { _ =>
+          httpClient.get(uri"$baseUrl/serviceiam")
+        }
         abc <- (
-          httpClient.get(uri"$baseUrl/servicea"),
-          httpClient.get(uri"$baseUrl/serviceb"),
-          httpClient.get(uri"$baseUrl/servicec")
+          traceCtx.withSpan("call_servicea").use { _ =>
+            httpClient.get(uri"$baseUrl/servicea")
+          },
+          traceCtx.withSpan("call_serviceb").use { _ =>
+            httpClient.get(uri"$baseUrl/serviceb")
+          },
+          traceCtx.withSpan("call_servicec").use { _ =>
+            httpClient.get(uri"$baseUrl/servicec")
+          }
         ).parMapN((_, _, _))
         _ <- IO.delay(logger.info(abc.toString))
       } yield HttpResponse(Ok)
