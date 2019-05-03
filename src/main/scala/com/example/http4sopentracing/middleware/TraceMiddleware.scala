@@ -8,16 +8,14 @@ import com.example.http4sopentracing.tracer.{FlowId, TraceContext}
 import org.http4s.{HttpRoutes, Request}
 
 object TraceMiddleware {
-  def wrap(
-      httpClient:   HttpClient,
-      rootSpanName: String,
-      tracer:       Tracer,
-      service:      (HttpClient, TraceContext) => HttpRoutes[IO]): HttpRoutes[IO] =
+  def wrap(httpClient: HttpClient, tracer: Tracer)(
+      rootSpanName:    String,
+      service:         (HttpClient, TraceContext) => HttpRoutes[IO]): HttpRoutes[IO] =
     Kleisli { req: Request[IO] =>
       OptionT {
         for {
           traceCtx <- TraceContext(rootSpanName, FlowId.from(None), tracer)
-          resp     <- traceCtx.contain().use(_ => service(httpClient, traceCtx).run(req).value)
+          resp     <- traceCtx.withCurrentSpan().use(_ => service(httpClient, traceCtx).run(req).value)
         } yield resp
       }
     }

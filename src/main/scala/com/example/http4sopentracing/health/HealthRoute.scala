@@ -7,7 +7,7 @@ import org.http4s.dsl.io._
 object HealthRoute {
   val healthCheck = HttpRoutes
     .of[IO] {
-      case GET -> Root / "health" =>
+      case GET -> Root =>
         Ok("Ok.")
     }
 }

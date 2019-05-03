@@ -2,27 +2,51 @@ package com.example.http4sopentracing.tracer
 
 import cats.effect.{IO, Resource}
 import io.opentracing.Tracer.SpanBuilder
+import io.opentracing.tag.Tags
 import io.opentracing.{Span, Tracer}
+import scala.collection.JavaConverters._
+import cats.implicits._
 
-case class TraceContext(span: Span, flowId: FlowId, tracer: Tracer) {
-  def withSpan(spanName: String, tags: List[(String, String)] = List.empty): Resource[IO, TraceContext] =
+case class TraceContext(span: Span, flowId: FlowId, tracer: Tracer, tags: List[(String, String)] = List.empty) {
+  def withChildSpan(spanName: String, tags: List[(String, String)] = List.empty): Resource[IO, TraceContext] =
     Resource.make {
       for {
         spanBuilder <- TraceContext.buildSpan(spanName, ("flow_id", flowId.value) :: tags, tracer)
         span        <- IO.delay(spanBuilder.asChildOf(span).start())
-      } yield this.copy(span = span)
+      } yield this.copy(span = span, tags = tags)
     } { traceCtx =>
       closeSpan(traceCtx.span)
     }
 
   def closeSpan(span: Span): IO[Unit] = IO.delay(span.finish())
 
-  def contain(tags: List[(String, String)] = List.empty): Resource[IO, List[(String, String)]] =
+  def withCurrentSpan(tags: List[(String, String)] = List.empty): Resource[IO, TraceContext] =
     Resource.make {
-      IO.pure(tags)
+      IO.pure(this.copy(tags = tags))
     } { _ =>
       closeSpan(span)
     }
+
+  def logToSpan(msg: String): IO[TraceContext] = IO.delay(span.log(msg)) >> IO.delay(this) // FlatMap while ignoring return value
+
+  def logErrorToSpan(err: RuntimeException): IO[Unit] =
+    toSpanError(err).flatMap { errorMap =>
+      IO.delay(
+        span
+          .setTag(Tags.ERROR.getKey, true)
+          .log(errorMap.asJava)
+      )
+    }
+
+  private def toSpanError(err: RuntimeException): IO[Map[String, String]] =
+    IO.delay(
+      Map(
+        "error.kind" -> Option(err.getClass.getName).getOrElse("class-name-not-found"),
+        "event" -> "error",
+        "message" -> Option(err.getMessage).getOrElse("exception-with-empty-message"),
+        "stack" -> Some(err.getStackTrace.mkString("\n")).getOrElse("no-stacktrace-available")
+      )
+    )
 }
 
 object TraceContext {
@@ -31,9 +55,6 @@ object TraceContext {
       spanBuilder <- buildSpan(spanName, List.empty, tracer)
       span        <- IO.delay(spanBuilder.start())
     } yield TraceContext(span, flowId, tracer)
-
-  def apply(tracer: Tracer)(spanName: String, flowId: FlowId): IO[TraceContext] =
-    TraceContext(spanName, flowId, tracer)
 
   def buildSpan(spanName: String, tags: List[(String, String)], tracer: Tracer): IO[SpanBuilder] =
     for {
