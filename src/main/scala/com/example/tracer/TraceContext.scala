@@ -60,7 +60,6 @@ case class TraceContext(span: Span, flowId: FlowId, tracer: Tracer, tags: List[(
     tracer.inject(span.context(), Format.Builtin.HTTP_HEADERS, new TextMapInjectAdapter(headerMap))
     headerMap.asScala.toMap
   }
-
 }
 
 object TraceContext {

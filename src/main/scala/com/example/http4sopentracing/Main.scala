@@ -46,14 +46,16 @@ object Server extends IOApp {
 
   def getTracer: Tracer = {
     val jConfig = JaegerConfig(
-      "server-trace",
-      "const",
-      1,
-      true
+      serviceName      = "http4s-trace",
+      samplerType      = "const",
+      samplerParam     = 1,
+      reporterLogSpans = true
     )
+
     val config         = Configuration.fromEnv(jConfig.serviceName)
     val samplerConfig  = SamplerConfiguration.fromEnv().withType(jConfig.samplerType).withParam(jConfig.samplerParam)
     val reporterConfig = ReporterConfiguration.fromEnv().withLogSpans(jConfig.reporterLogSpans)
+
     config.withSampler(samplerConfig).withReporter(reporterConfig).getTracer
   }
 
