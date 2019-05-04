@@ -1,11 +1,15 @@
 package com.example.http4sopentracing.tracer
 
 import cats.effect.{IO, Resource}
+import io.opentracing.SpanContext
 import io.opentracing.Tracer.SpanBuilder
+import io.opentracing.propagation.{Format, TextMapExtractAdapter}
 import io.opentracing.tag.Tags
 import io.opentracing.{Span, Tracer}
+import org.http4s.util.CaseInsensitiveString
 import scala.collection.JavaConverters._
 import cats.implicits._
+import scala.util.{Failure, Success, Try}
 
 case class TraceContext(span: Span, flowId: FlowId, tracer: Tracer, tags: List[(String, String)] = List.empty) {
   def withChildSpan(spanName: String, tags: List[(String, String)] = List.empty): Resource[IO, TraceContext] =
@@ -47,10 +51,13 @@ case class TraceContext(span: Span, flowId: FlowId, tracer: Tracer, tags: List[(
         "stack" -> Some(err.getStackTrace.mkString("\n")).getOrElse("no-stacktrace-available")
       )
     )
+
 }
 
 object TraceContext {
-  def apply(spanName: String, flowId: FlowId, tracer: Tracer): IO[TraceContext] =
+  def apply(spanName: String, flowId: FlowId, tracer: Tracer): IO[TraceContext] = create(spanName, flowId, tracer)
+
+  def create(spanName: String, flowId: FlowId, tracer: Tracer): IO[TraceContext] =
     for {
       spanBuilder <- buildSpan(spanName, List.empty, tracer)
       span        <- IO.delay(spanBuilder.start())
@@ -66,4 +73,27 @@ object TraceContext {
     IO.delay(tags.foldLeft(spanBuilder) {
       case (accSpan, (tag, tagValue)) => accSpan.withTag(tag, tagValue)
     })
+
+  def extractFrom(headers: org.http4s.Headers, rootSpanName: String, tracer: Tracer): IO[TraceContext] =
+    for {
+      adapter     <- createTMAdapterFrom(headers)
+      spanContext <- trySpanCtxExtraction(adapter, tracer)
+      flowIdOpt   <- IO.pure(headers.get(CaseInsensitiveString("flow_id")).map(_.value))
+      newTraceCtx <- create(rootSpanName, FlowId.from(flowIdOpt), tracer)
+    } yield newTraceCtx
+
+  private def createTMAdapterFrom(headers: org.http4s.Headers) =
+    IO.delay(
+      new TextMapExtractAdapter(
+        headers.toList.map { header =>
+          header.name.toString() -> header.value.toString()
+        }.toMap.asJava
+      )
+    )
+
+  private def trySpanCtxExtraction(adapter: TextMapExtractAdapter, tracer: Tracer): IO[SpanContext] =
+    Try(tracer.extract(Format.Builtin.HTTP_HEADERS, adapter)) match {
+      case Success(spanContext) => IO.pure(spanContext)
+      case Failure(exception)   => IO.raiseError(new RuntimeException(s"Error extracting span context: ${exception.getMessage}"))
+    }
 }

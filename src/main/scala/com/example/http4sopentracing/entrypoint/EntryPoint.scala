@@ -18,7 +18,7 @@ object EntryPoint {
   val baseUrl = "http://127.0.0.1:8080"
 
   def service(httpClient: HttpClient, traceCtx: TraceContext) = HttpRoutes.of[IO] {
-    case GET -> Root =>
+    case req @ GET -> Root =>
       for {
         _ <- IO.delay(logger.info("Received request"))
         _ <- traceCtx.withChildSpan("call_iam").use { _ =>
