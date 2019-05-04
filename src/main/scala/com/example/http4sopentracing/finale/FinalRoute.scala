@@ -1,16 +1,16 @@
-package com.example.http4sopentracing.serviceiam
+package com.example.http4sopentracing.finale
 
 import cats.effect.IO
 import com.example.http4sopentracing.client.HttpClient
 import com.example.http4sopentracing.tracer.TraceContext
-import org.http4s.{HttpRoutes, Response => HttpResponse}
+import org.http4s._
 import org.http4s.dsl.io._
 import org.log4s.{getLogger, Logger}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object ServiceIam {
-  val logger: Logger        = getLogger("ServiceIam")
+object FinalRoute {
+  val logger: Logger        = getLogger("FinalRoute")
   implicit val timer        = IO.timer(global)
   implicit val contextShift = IO.contextShift(global)
 
@@ -18,9 +18,7 @@ object ServiceIam {
     case GET -> Root =>
       for {
         _ <- IO.delay(logger.info("Received request"))
-        _ <- traceCtx.withChildSpan("call_final").use { _ =>
-          IO.sleep(50.milliseconds)
-        }
-      } yield HttpResponse(Ok)
+        _ <- IO.sleep(50.milliseconds)
+      } yield Response(Ok)
   }
 }

@@ -2,16 +2,28 @@ package com.example.http4sopentracing.servicec
 
 import cats.effect.IO
 import com.example.http4sopentracing.client.HttpClient
-import org.http4s._
+import com.example.http4sopentracing.tracer.TraceContext
+import org.http4s.{HttpRoutes, Response => HttpResponse}
 import org.http4s.dsl.io._
 import org.log4s.{getLogger, Logger}
+import scala.concurrent.ExecutionContext.Implicits.global
+import com.softwaremill.sttp._
 
-class ServiceC(httpClient: HttpClient) {
-  val logger: Logger = getLogger("ServiceC")
+object ServiceC {
+  val logger: Logger        = getLogger("ServiceC")
+  implicit val contextShift = IO.contextShift(global)
 
-  val service = HttpRoutes.of[IO] {
-    case GET -> Root / "servicec" =>
-      logger.info("Received request")
-      Ok()
+  val baseUrl = "http://127.0.0.1:8080"
+  def service(httpClient: HttpClient, traceCtx: TraceContext) = HttpRoutes.of[IO] {
+    case GET -> Root =>
+      for {
+        _ <- IO.delay(logger.info("Received request"))
+        _ <- traceCtx.withChildSpan("call_faulty").use { ctx =>
+          ctx.logErrorToSpan(new RuntimeException("Faulty service is being faulty."))
+        }
+        _ <- traceCtx.withChildSpan("call_final").use { ctx =>
+          httpClient.get(uri"$baseUrl/final", ctx.getHttpHeaders)
+        }
+      } yield HttpResponse(Ok)
   }
 }
