@@ -21,18 +21,18 @@ object EntryPoint {
     case req @ GET -> Root =>
       for {
         _ <- IO.delay(logger.info("Received request"))
-        _ <- traceCtx.withChildSpan("call_iam").use { _ =>
-          httpClient.get(uri"$baseUrl/serviceiam")
+        _ <- traceCtx.withChildSpan("call_iam").use { ctx =>
+          httpClient.get(uri"$baseUrl/serviceiam", ctx.getHttpHeaders)
         }
         abc <- (
-          traceCtx.withChildSpan("call_servicea").use { _ =>
-            httpClient.get(uri"$baseUrl/servicea")
+          traceCtx.withChildSpan("call_servicea").use { ctx =>
+            httpClient.get(uri"$baseUrl/servicea", ctx.getHttpHeaders)
           },
-          traceCtx.withChildSpan("call_serviceb").use { _ =>
-            httpClient.get(uri"$baseUrl/serviceb")
+          traceCtx.withChildSpan("call_serviceb").use { ctx =>
+            httpClient.get(uri"$baseUrl/serviceb", ctx.getHttpHeaders)
           },
-          traceCtx.withChildSpan("call_servicec").use { _ =>
-            httpClient.get(uri"$baseUrl/servicec")
+          traceCtx.withChildSpan("call_servicec").use { ctx =>
+            httpClient.get(uri"$baseUrl/servicec", ctx.getHttpHeaders)
           }
         ).parMapN((_, _, _))
         _ <- IO.delay(logger.info(abc.toString))

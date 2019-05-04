@@ -11,6 +11,7 @@ import com.example.http4sopentracing.servicea.ServiceA
 import com.example.http4sopentracing.serviceb.ServiceB
 import com.example.http4sopentracing.servicec.ServiceC
 import com.example.http4sopentracing.serviceiam.ServiceIam
+import com.example.http4sopentracing.finale.FinalRoute
 import io.jaegertracing.Configuration
 import io.jaegertracing.Configuration.{ReporterConfiguration, SamplerConfiguration}
 import io.opentracing.Tracer
@@ -39,7 +40,8 @@ object Server extends IOApp {
     "/servicea" -> middlewarePA("service-a", ServiceA.service),
     "/serviceb" -> middlewarePA("service-b", ServiceB.service),
     "/servicec" -> middlewarePA("service-c", ServiceC.service),
-    "/serviceiam" -> middlewarePA("service-iam", ServiceIam.service)
+    "/serviceiam" -> middlewarePA("service-iam", ServiceIam.service),
+    "/final" -> middlewarePA("final", FinalRoute.service)
   ).orNotFound
 
   def getTracer: Tracer = {
